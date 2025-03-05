@@ -26,6 +26,12 @@ class KafkaProducerServiceTest {
 
     @Mock
     private ListenableFuture<SendResult<String, Product>> listenableFuture;
+    
+    @Mock
+    private SendResult<String, Product> sendResult;
+    
+    @Mock
+    private org.apache.kafka.clients.producer.RecordMetadata recordMetadata;
 
     @InjectMocks
     private KafkaProducerService kafkaProducerService;
@@ -49,8 +55,11 @@ class KafkaProducerServiceTest {
     void sendProduct_ShouldSendProductToKafka() {
         // Arrange
         when(kafkaTemplate.send(anyString(), anyString(), any(Product.class))).thenReturn(listenableFuture);
+        when(sendResult.getRecordMetadata()).thenReturn(recordMetadata);
+        when(recordMetadata.offset()).thenReturn(0L);
+        
         doAnswer(invocation -> {
-            ((org.springframework.util.concurrent.ListenableFutureCallback) invocation.getArgument(0)).onSuccess(null);
+            ((org.springframework.util.concurrent.ListenableFutureCallback) invocation.getArgument(0)).onSuccess(sendResult);
             return null;
         }).when(listenableFuture).addCallback(any());
 

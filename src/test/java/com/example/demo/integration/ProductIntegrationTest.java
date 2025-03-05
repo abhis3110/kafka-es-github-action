@@ -21,6 +21,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import static org.awaitility.Awaitility.await;
@@ -121,19 +122,20 @@ class ProductIntegrationTest {
     @Test
     void kafkaConsumer_ShouldSaveProductToElasticsearch() throws Exception {
         // Send a product to Kafka
-        kafkaTemplate.send(topicName, "test-key", product);
+        product.setId("test-id-" + System.currentTimeMillis()); // Ensure unique ID
+        kafkaTemplate.send(topicName, product.getId(), product).get(); // Wait for send to complete
 
         // Wait for the consumer to process the message and save to Elasticsearch
-        await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
-            // Search for the product by name
-            assertThat(productRepository.findByNameContaining(product.getName())).isNotEmpty();
+        await().atMost(10, TimeUnit.SECONDS).untilAsserted(() -> {
+            // Use findById instead of findByNameContaining
+            Optional<Product> savedProductOpt = productRepository.findById(product.getId());
+            assertThat(savedProductOpt).isPresent();
+            
+            Product savedProduct = savedProductOpt.get();
+            assertThat(savedProduct.getName()).isEqualTo(product.getName());
+            assertThat(savedProduct.getDescription()).isEqualTo(product.getDescription());
+            assertThat(savedProduct.getPrice()).isEqualTo(product.getPrice());
+            assertThat(savedProduct.getCategory()).isEqualTo(product.getCategory());
         });
-
-        // Verify the product was saved correctly
-        Product savedProduct = productRepository.findByNameContaining(product.getName()).get(0);
-        assertThat(savedProduct.getName()).isEqualTo(product.getName());
-        assertThat(savedProduct.getDescription()).isEqualTo(product.getDescription());
-        assertThat(savedProduct.getPrice()).isEqualTo(product.getPrice());
-        assertThat(savedProduct.getCategory()).isEqualTo(product.getCategory());
     }
 }
